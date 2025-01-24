@@ -1,11 +1,15 @@
 #pragma once
 
 #include "RE/Skyrim.h"
-#include "REL/Relocation.h"
 #include "SKSE/SKSE.h"
 
 #include <spdlog/sinks/basic_file_sink.h>
 
+namespace logger = SKSE::log;
+
 using namespace std::literals;
 
-#define DLLEXPORT __declspec(dllexport)
+namespace stl
+{
+	using namespace SKSE::stl;
+}

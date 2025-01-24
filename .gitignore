@@ -333,3 +333,7 @@ ASALocalRun/
 # Local History for Visual Studio
 .localhistory/
 RCa12768
+
+CMakeUserPresets.json
+build
+dist

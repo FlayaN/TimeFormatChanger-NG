@@ -1,199 +1,80 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.26)
 
-# Setup project
+set(PROJECT_AUTHOR "Vermunds")
 project(
-	TimeFormatChanger
-	VERSION 1.2.1
-	LANGUAGES CXX
-)
-set(FORMATTED_NAME "Time Format Changer")
-set(LICENSE "MIT License")
-set(AUTHOR "Vermunds")
+  TimeFormatChanger
+  VERSION 1.2.1
+  LANGUAGES CXX)
 
-# Include guards
+# ##############################################################################
+# # Source build guard
+# ##############################################################################
+
 if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
-	message(
-		FATAL_ERROR
-			"In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
-	)
+  message(
+    FATAL_ERROR
+      "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
+  )
 endif()
 
-# Configure files
-configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/cmake/Version.h.in
-	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
-	@ONLY
-)
+# ##############################################################################
+# # Add CommonLibNG plugin
+# ##############################################################################
 
-configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in
-	${CMAKE_CURRENT_BINARY_DIR}/version.rc
-	@ONLY
-)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include(CLIBNGPlugin)
+add_simple_commonlibsse_ng_plugin(AUTHOR "${PROJECT_AUTHOR}" LICENSE
+                                  "MIT License")
 
+# ##############################################################################
+# # Build options
+# ##############################################################################
 
-# Include sources
-include(cmake/sourcelist.cmake)
-source_group(
-	TREE "${CMAKE_CURRENT_SOURCE_DIR}"
-	FILES ${SOURCES}
-)
+message("Options:")
+option(ZIP_TO_DIST "Zip the mod to 7z file in dist." ON)
+message("\tZip to dist: ${ZIP_TO_DIST}")
 
-# Global compile definitions
-if (MSVC)
-	add_compile_definitions(
-		_UNICODE
-	)
+# ##############################################################################
+# # Find dependencies
+# ##############################################################################
 
-	if (NOT ${CMAKE_GENERATOR} STREQUAL "Ninja")
-		add_compile_options(
-			/MP	# Build with Multiple Processes
-		)
-	endif ()
-endif ()
+find_path(CLIB_UTIL_INCLUDE_DIRS "ClibUtil/detail/SimpleIni.h")
 
-# Create DLL
-add_library(
-	${PROJECT_NAME}
-	SHARED
-	${SOURCES}
-	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
-	${CMAKE_CURRENT_BINARY_DIR}/version.rc
-	.clang-format
-	.editorconfig
-)
+# ##############################################################################
+# # Post target setup
+# ##############################################################################
 
-# CXX standard
-target_compile_features(
-	${PROJECT_NAME}
-	PRIVATE
-		cxx_std_23
-)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CLIB_UTIL_INCLUDE_DIRS})
 
-# Include directories
-target_include_directories(
-	${PROJECT_NAME}
-	PRIVATE
-		${CMAKE_CURRENT_BINARY_DIR}/include
-		${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+# ##############################################################################
+# # Generates a zip in /dist
+# ##############################################################################
 
-target_include_directories(
-	${PROJECT_NAME}
-	PUBLIC
-		"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-		"$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-)
+if(ZIP_TO_DIST)
+  set(ZIP_DIR "${CMAKE_CURRENT_BINARY_DIR}/zip")
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${ZIP_DIR}"
+            ${CMAKE_SOURCE_DIR}/dist
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ZIP_DIR}/SKSE/Plugins"
+            ${CMAKE_SOURCE_DIR}/dist)
 
-# Precompile header
-target_precompile_headers(
-	${PROJECT_NAME}
-	PRIVATE
-		"include/PCH.h"
-)
+  message("Copying mod to ${ZIP_DIR}.")
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}>
+            "${ZIP_DIR}/SKSE/Plugins/"
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_PDB_FILE:${PROJECT_NAME}>
+            "${ZIP_DIR}/SKSE/Plugins/")
 
-# Find and link dependencies
-find_package(spdlog REQUIRED CONFIG)
-
-target_link_libraries(
-	${PROJECT_NAME}
-	PRIVATE
-		CommonLibSSE::CommonLibSSE
-		spdlog::spdlog
-)
-
-# Compile definitions
-if (MSVC)
-	target_compile_options(
-		${PROJECT_NAME}
-		PRIVATE
-			/sdl	# Enable Additional Security Checks
-			/utf-8	# Set Source and Executable character sets to UTF-8
-			/Zi	# Debug Information Format
-
-			/permissive-	# Standards conformance
-
-			/Zc:alignedNew	# C++17 over-aligned allocation
-			/Zc:auto	# Deduce Variable Type
-			/Zc:char8_t
-			/Zc:__cplusplus	# Enable updated __cplusplus macro
-			/Zc:externC
-			/Zc:externConstexpr	# Enable extern constexpr variables
-			/Zc:forScope	# Force Conformance in for Loop Scope
-			/Zc:hiddenFriend
-			/Zc:implicitNoexcept	# Implicit Exception Specifiers
-			/Zc:lambda
-			/Zc:noexceptTypes	# C++17 noexcept rules
-			/Zc:preprocessor	# Enable preprocessor conformance mode
-			/Zc:referenceBinding	# Enforce reference binding rules
-			/Zc:rvalueCast	# Enforce type conversion rules
-			/Zc:sizedDealloc	# Enable Global Sized Deallocation Functions
-			/Zc:strictStrings	# Disable string literal type conversion
-			/Zc:ternary	# Enforce conditional operator rules
-			/Zc:threadSafeInit	# Thread-safe Local Static Initialization
-			/Zc:tlsGuards
-			/Zc:trigraphs	# Trigraphs Substitution
-			/Zc:wchar_t	# wchar_t Is Native Type
-
-			# Warning -> error
-			/we4715	# 'function' : not all control paths return a value
-
-			# Disable warnings
-			/wd4458  # declaration hides class member
-			/wd4100 # unreferenced formal parameter
-
-
-			/external:anglebrackets
-			/external:W0
-
-			/W4	# Warning level
-			#/WX	# Warning level (warnings are errors)
-
-			"$<$<CONFIG:DEBUG>:>"
-			"$<$<CONFIG:RELEASE>:/Zc:inline;/JMC-;/Ob3>"
-	)
-
-	target_link_options(
-		${PROJECT_NAME}
-		PRIVATE
-			#/WX	# Treat Linker Warnings as Errors
-
-			"$<$<CONFIG:DEBUG>:/INCREMENTAL;/OPT:NOREF;/OPT:NOICF>"
-			"$<$<CONFIG:RELEASE>:/INCREMENTAL:NO;/OPT:REF;/OPT:ICF;/DEBUG:FULL>"
-	)
-endif ()
-
-target_compile_definitions(
-	"${PROJECT_NAME}"
-	PUBLIC
-		BOOST_STL_INTERFACES_DISABLE_CONCEPTS
-		WINVER=0x0601	# windows 7, minimum supported version by skyrim special edition
-		_WIN32_WINNT=0x0601
-		"$<$<BOOL:${SKSE_SUPPORT_XBYAK}>:SKSE_SUPPORT_XBYAK=1>"
-)
-
-# Function to copy build artifacts to the specified path
-function(copy_build_artifacts TARGET_NAME)
-    if (DEFINED SKYRIM_DATA_PATH)
-        set(INSTALL_PATH "${SKYRIM_DATA_PATH}/SKSE/Plugins")
-    elseif (DEFINED MO_MODS_FOLDER_PATH)
-        set(INSTALL_PATH "${MO_MODS_FOLDER_PATH}/${TARGET_NAME}/SKSE/Plugins")
-    else ()
-        message(STATUS "No install path specified for mod ${TARGET_NAME}. Skipping post-build copy command.")
-        return()
-    endif()
-
-	# Create the directories if they don't exist
-    file(MAKE_DIRECTORY ${INSTALL_PATH})
-
-    message(STATUS "Using install path for ${TARGET_NAME}: ${INSTALL_PATH}")
-    add_custom_command(
-        TARGET ${TARGET_NAME}
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${TARGET_NAME}> ${INSTALL_PATH}
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_PDB_FILE:${TARGET_NAME}> ${INSTALL_PATH}
-    )
-endfunction()
-
-# Post build command
-copy_build_artifacts(${PROJECT_NAME})
+  set(TARGET_ZIP "${PROJECT_NAME}${PROJECT_VERSION}.7z")
+  message("Zipping ${ZIP_DIR} to ${CMAKE_SOURCE_DIR}/dist/${TARGET_ZIP}")
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E tar cf ${CMAKE_SOURCE_DIR}/dist/${TARGET_ZIP}
+            --format=7zip -- .
+    WORKING_DIRECTORY ${ZIP_DIR})
+endif()

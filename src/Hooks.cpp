@@ -156,6 +156,6 @@ namespace TimeFormatChanger
 
 	void InstallHook()
 	{
-		SKSE::GetTrampoline().write_branch<5>(REL::ID{ 36311 }.address(), (std::uintptr_t)FormatTime_Hook);
+		SKSE::GetTrampoline().write_branch<5>(REL::RelocationID{ 35413, 36311 }.address(), (std::uintptr_t)FormatTime_Hook);
 	}
 }
